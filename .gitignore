@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+
+# Virtual environments
+.venv/
+.venv312/
+venv/
+env/
+
+# IDE
+.idea/
+
+# OS
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Claude Code local overrides
+.claude/settings.local.json
+
+# Logs / caches
+*.log
+.pytest_cache/
