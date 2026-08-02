@@ -1,6 +1,25 @@
 from __future__ import print_function
 import torch
 
+print('shape 方法: ----------------------------------------------------')
+x = torch.ones(5, 3)
+print(x.shape)
+
+print('view 方法: -----------------------------------------------------')
+print(x.view(5, 3))
+
+print('stride 方法: ---------------------------------------------------')
+print(x.stride())
+
+print('torch.arange 方法: ---------------------------------------------')
+x = torch.arange(12)
+print(x)
+
+print('reshape 方法: --------------------------------------------------')
+y = x.reshape(4, 3)
+print(y)
+
+print('torch.empty 方法: ----------------------------------------------')
 # 构造一个 5行3列的 数值全部为0的矩阵
 x = torch.empty(5, 3)
 print(x)
@@ -59,14 +78,9 @@ print('二维张量转置前: --------------------------------------------------
 x = torch.tensor([[1, 1, 1, 1, 1], [2, 2, 2, 2, 2], [3, 3, 3, 3, 3]], dtype=torch.int32)
 print(x)
 print('二维张量转置后: ---------------------------------------------------------------')
-y = x.t()
-print(y)
-
-print('---------------------------------------------------------------')
-x = torch.rand(2, 3, 2, dtype=torch.float)
+x.t_()
+print(x.is_contiguous())
 print(x)
-
-print(torch.Size([3, 2, 2]))
 print('四维张量转置前: ---------------------------------------------------------------')
 x = torch.tensor([
     [
@@ -95,7 +109,12 @@ x = torch.tensor([
     ]], dtype=torch.int32)
 print(x)
 print('四维张量转置后: ---------------------------------------------------------------')
+# 转置 组 和 块; 张量矩阵中的 x, y 不动
+x.transpose_(1, 0)
+# 转置 x 和 y; 组 和 块 不动
+# x.transpose_(2, 3)
+# x.transpose(2, 3)
+
+# 转置后内存不连续了为什呢？
 print(x.is_contiguous())
-x.contiguous()
-x.transpose_(0, 1)
 print(x)
