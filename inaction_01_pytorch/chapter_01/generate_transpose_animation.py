@@ -167,6 +167,6 @@ def update(frame):
 from matplotlib.animation import FuncAnimation, PillowWriter
 
 anim = FuncAnimation(fig, update, frames=frames, interval=90, blit=False)
-out_path = "/inaction_01_pytorch/chatper_01/transpose_animation.gif"
+out_path = "/inaction_01_pytorch/chapter_01/transpose_animation.gif"
 anim.save(out_path, writer=PillowWriter(fps=11))
 print("saved", out_path)
