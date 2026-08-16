@@ -135,4 +135,4 @@ print(z.to("cpu", torch.double))  # tensor([2.], dtype=torch.float64)
 - **Colab Pro+**：更长后台运行、更高优先级。
 - 免费版对于学习和小规模训练完全够用，建议先用免费版试试。
 
-> 具体如何在 Colab 中切换 GPU 运行时、验证 CUDA、写训练代码，见同目录下的 [google_colab配置cuda训练.md](./google_colab配置cuda训练.md)。
+> 具体如何在 Colab 中切换 GPU 运行时、验证 CUDA、写训练代码，见同目录下的 [00_google_colab配置cuda训练.md](./00_google_colab配置cuda训练.md)。
