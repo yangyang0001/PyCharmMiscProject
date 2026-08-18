@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LeNet-5 数据流</title>
+<style>
+  :root {
+    --bg: #eef1f4;
+    --surface: #ffffff;
+    --surface-2: #e3e8ed;
+    --ink: #16212b;
+    --ink-soft: #4c5a67;
+    --ink-faint: #7c8894;
+    --line: #c7d0d8;
+    --line-soft: #dbe1e6;
+    --signal: #0e8e86;
+    --signal-strong: #086a64;
+    --signal-soft: #d3ede9;
+    --math: #b4590f;
+    --math-soft: #f3e2cf;
+    --shadow: rgba(22, 33, 43, 0.10);
+    --k-input: #2f6fa8;
+    --k-conv: #c1841f;
+    --k-pool: #3f8f63;
+    --k-fc: #7a5fb0;
+    --k-output: #c1503f;
+    --k-line: #aab4bd;
+    --font-display: "IBM Plex Sans Condensed", "Arial Narrow", sans-serif;
+    --font-body: "IBM Plex Sans", "Segoe UI", sans-serif;
+    --font-mono: "IBM Plex Mono", "SF Mono", Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0e1519;
+      --surface: #162026;
+      --surface-2: #1d2a31;
+      --ink: #e7edf0;
+      --ink-soft: #9db0ba;
+      --ink-faint: #6d818b;
+      --line: #2b3941;
+      --line-soft: #222e35;
+      --signal: #4fd9ce;
+      --signal-strong: #7fe8de;
+      --signal-soft: #17383a;
+      --math: #e3a15c;
+      --math-soft: #2e2416;
+      --shadow: rgba(0, 0, 0, 0.35);
+      --k-input: #6badf0;
+      --k-conv: #e3b35c;
+      --k-pool: #63c793;
+      --k-fc: #a893e0;
+      --k-output: #e58274;
+      --k-line: #4b5860;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #0e1519;
+    --surface: #162026;
+    --surface-2: #1d2a31;
+    --ink: #e7edf0;
+    --ink-soft: #9db0ba;
+    --ink-faint: #6d818b;
+    --line: #2b3941;
+    --line-soft: #222e35;
+    --signal: #4fd9ce;
+    --signal-strong: #7fe8de;
+    --signal-soft: #17383a;
+    --math: #e3a15c;
+    --math-soft: #2e2416;
+    --shadow: rgba(0, 0, 0, 0.35);
+    --k-input: #6badf0;
+    --k-conv: #e3b35c;
+    --k-pool: #63c793;
+    --k-fc: #a893e0;
+    --k-output: #e58274;
+    --k-line: #4b5860;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+  }
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--signal-strong);
+    margin: 0 0 10px;
+  }
+
+  h1 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: clamp(28px, 5vw, 40px);
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    margin: 0 0 10px;
+  }
+
+  .subtitle {
+    color: var(--ink-soft);
+    font-size: 16px;
+    max-width: 62ch;
+    margin: 0 0 6px;
+  }
+
+  .source-note {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    color: var(--ink-faint);
+    margin: 18px 0 0;
+  }
+  .source-note code {
+    background: var(--surface-2);
+    border-radius: 4px;
+    padding: 2px 5px;
+  }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin: 18px 0 0;
+    padding: 10px 14px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 9px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    white-space: nowrap;
+  }
+  .legend-swatch {
+    flex-shrink: 0;
+  }
+
+  section {
+    margin-top: 56px;
+  }
+
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+  }
+
+  .section-head h2 {
+    font-family: var(--font-display);
+    font-size: 21px;
+    font-weight: 700;
+    margin: 0;
+  }
+
+  .section-head .tag {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--ink-faint);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 2px 10px;
+  }
+
+  .section-desc {
+    color: var(--ink-soft);
+    font-size: 14.5px;
+    max-width: 66ch;
+    margin: 0 0 26px;
+  }
+
+  /* ---- Section A: construction ---- */
+
+  .layer-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 14px;
+  }
+
+  .layer-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 16px 16px 14px;
+    box-shadow: 0 1px 2px var(--shadow);
+  }
+
+  .layer-card .name-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 8px;
+  }
+
+  .layer-card .step {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.04em;
+    color: var(--ink-faint);
+    margin: 0 0 4px;
+  }
+
+  .layer-card .name {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 15px;
+    margin: 0;
+  }
+
+  .layer-card .args {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--ink-faint);
+    margin: -8px 0 12px;
+    word-break: break-word;
+  }
+
+  .layer-card .calc-label {
+    font-size: 11px;
+    color: var(--ink-faint);
+    display: block;
+    margin-top: 2px;
+  }
+
+  .layer-card .init {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--line);
+    font-size: 12px;
+    color: var(--ink-soft);
+    line-height: 1.5;
+  }
+  .layer-card .init b {
+    font-family: var(--font-mono);
+    color: var(--k-fc);
+    font-weight: 600;
+  }
+
+  .layer-card .role {
+    margin: 10px 0 0;
+    font-size: 12.5px;
+    color: var(--ink-soft);
+  }
+
+  .layer-card .code {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--ink-soft);
+    background: var(--surface-2);
+    border-radius: 6px;
+    padding: 5px 8px;
+    margin-bottom: 12px;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .layer-card .row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 12.5px;
+    color: var(--ink-faint);
+    padding: 6px 0;
+    border-top: 1px solid var(--line-soft);
+    font-variant-numeric: tabular-nums;
+  }
+  .layer-card .row:first-of-type { border-top: none; }
+
+  .layer-card .row .val {
+    font-family: var(--font-mono);
+    color: var(--ink);
+    font-size: 12.5px;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  .layer-card .params {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--line);
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    color: var(--math);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .params-total {
+    margin-top: 14px;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    font-family: var(--font-mono);
+    font-size: 13.5px;
+    color: var(--ink-soft);
+    flex-wrap: wrap;
+  }
+  .params-total b {
+    color: var(--math);
+    font-size: 16px;
+  }
+
+  /* ---- Section B: forward flow ---- */
+
+  .flow-controls {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--bg);
+    padding: 10px 0 14px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+
+  .flow-controls button {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    background: var(--surface);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    padding: 7px 12px;
+    cursor: pointer;
+  }
+  .flow-controls button:hover { border-color: var(--signal); color: var(--signal-strong); }
+  .flow-controls button:focus-visible {
+    outline: 2px solid var(--signal);
+    outline-offset: 2px;
+  }
+
+  .flow-step-indicator {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    color: var(--ink-faint);
+    margin-left: 4px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .flow-rail-wrap {
+    position: relative;
+    padding-left: 4px;
+  }
+
+  .flow-rail-line {
+    position: absolute;
+    left: 23px;
+    top: 6px;
+    bottom: 6px;
+    width: 2px;
+    background: var(--line);
+  }
+
+  .flow-pulse {
+    position: absolute;
+    left: 15px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--signal);
+    box-shadow: 0 0 0 4px var(--signal-soft), 0 0 16px var(--signal);
+    transition: top 0.55s cubic-bezier(0.65, 0, 0.35, 1);
+    z-index: 2;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .flow-pulse { transition: none; }
+  }
+
+  .flow-list { list-style: none; margin: 0; padding: 0; }
+
+  .flow-item {
+    display: grid;
+    grid-template-columns: 48px 1fr;
+    gap: 4px;
+    cursor: pointer;
+    padding: 10px 0;
+  }
+
+  .flow-node {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-top: 6px;
+  }
+
+  .flow-node .dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 2px solid var(--line);
+    z-index: 3;
+    transition: border-color 0.3s, background 0.3s;
+  }
+
+  .flow-item.is-active .flow-node .dot {
+    border-color: var(--signal);
+    background: var(--signal);
+  }
+
+  .flow-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px 16px;
+    transition: border-color 0.3s, box-shadow 0.3s, background 0.3s;
+  }
+
+  .flow-item.is-active .flow-card {
+    border-color: var(--signal);
+    box-shadow: 0 0 0 1px var(--signal-soft), 0 4px 18px var(--shadow);
+    background: linear-gradient(180deg, var(--signal-soft), transparent 55%), var(--surface);
+  }
+
+  .flow-top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+  }
+
+  .flow-step {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--ink-faint);
+    letter-spacing: 0.05em;
+  }
+
+  .flow-title {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 15.5px;
+  }
+
+  .flow-icon-wrap {
+    flex-shrink: 0;
+    width: 56px;
+    height: 56px;
+    border-radius: 8px;
+    background: var(--surface-2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.3s;
+  }
+  .flow-item.is-active .flow-icon-wrap { background: var(--signal-soft); }
+
+  .flow-op {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    background: var(--surface-2);
+    border-radius: 6px;
+    padding: 3px 7px;
+    display: inline-block;
+    margin: 2px 0 8px;
+  }
+
+  .flow-body-row {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .flow-shape {
+    font-family: var(--font-mono);
+    font-size: 16px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .flow-formula {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--math);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .flow-note {
+    font-size: 13px;
+    color: var(--ink-soft);
+    max-width: 46ch;
+    margin: 6px 0 0;
+  }
+
+  .flow-derive, .flow-compute {
+    margin: 8px 0 0;
+    padding: 8px 10px;
+    background: var(--surface-2);
+    border-radius: 8px;
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    line-height: 1.6;
+    border-left: 3px solid transparent;
+  }
+  .flow-derive { border-left-color: var(--signal); }
+  .flow-compute { border-left-color: var(--math); }
+  .flow-derive .lbl, .flow-compute .lbl {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    color: var(--ink-faint);
+    display: block;
+    margin-bottom: 3px;
+  }
+  .flow-derive code, .flow-compute code {
+    font-family: var(--font-mono);
+    color: var(--math);
+    font-size: 12px;
+  }
+  .flow-derive code { color: var(--signal-strong); }
+
+  .flow-matrix {
+    margin: 10px 0 0;
+    padding: 10px 12px;
+    background: var(--surface);
+    border: 1px solid var(--line-soft);
+    border-radius: 8px;
+  }
+  .flow-matrix .lbl {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    color: var(--ink-faint);
+    display: block;
+    margin-bottom: 6px;
+  }
+  .flow-matrix svg { display: block; max-width: 100%; height: auto; overflow: visible; }
+
+  /* 卷积/池化滑动窗口的 @keyframes 按每个 stage 的真实位置数（28/10/14/5……）在 JS 里动态生成并注入，
+     因为每个 stage 的窗口能滑出的位置数不同，写死几步没法既保持真实又通用。见 injectKeyframes()。 */
+  @keyframes flowDotPulse {
+    0%, 6%   { opacity: 0.18; stroke-width: 1; }
+    10%, 16% { opacity: 1; stroke-width: 2.2; }
+    20%, 100% { opacity: 0.18; stroke-width: 1; }
+  }
+  @keyframes flowDotOut {
+    0%, 74%  { transform: scale(1); }
+    80%      { transform: scale(1.55); }
+    88%, 100% { transform: scale(1); }
+  }
+
+  .flow-matrix [class*="anim-"] { transform-box: fill-box; transform-origin: center; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .flow-matrix [class*="anim-"] { animation: none !important; }
+  }
+
+  footer {
+    margin-top: 64px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line-soft);
+    font-size: 12.5px;
+    color: var(--ink-faint);
+  }
+
+  @media (max-width: 520px) {
+    .flow-controls { flex-wrap: wrap; }
+  }
+</style>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+</head>
+<body>
+
+<div class="page">
+
+  <p class="eyebrow">PyTorch · LeNet-5 · torch.nn</p>
+  <h1>一张网络里的两种"计算"</h1>
+  <p class="subtitle">
+    <code style="font-family: var(--font-mono); font-size: 14px;">__init__</code> 只在创建网络时算一次层的形状；
+    <code style="font-family: var(--font-mono); font-size: 14px;">forward</code> 每次调用都要重新把张量形状推一遍、重新建一次动态图。下面把这两种计算分开画。
+  </p>
+  <p class="source-note">对应 <code>03_neural_networks.ipynb</code> / <code>03_神经网络.md</code> 第2、4、5节</p>
+
+  <div class="legend" id="legend" role="list" aria-label="图例：各阶段类型"></div>
+
+  <section aria-labelledby="build-head">
+    <div class="section-head">
+      <h2 id="build-head">① 构建阶段</h2>
+      <span class="tag">__init__ · 只跑一次</span>
+    </div>
+    <p class="section-desc">
+      五个带参数的层在这里被依次创建：构造参数直接决定权重/偏置的形状；<code style="font-family: var(--font-mono); font-size: 13px;">nn.Module</code> 重写过的
+      <code style="font-family: var(--font-mono); font-size: 13px;">__setattr__</code> 会把它们自动注册进 <code style="font-family: var(--font-mono); font-size: 13px;">net._modules</code>；
+      随后 PyTorch 用 <code style="font-family: var(--font-mono); font-size: 13px;">kaiming_uniform_</code> 给权重和偏置填上初始随机值——这三件事，才是"创建网络"时真正发生的全部计算。
+    </p>
+    <div class="layer-grid" id="layer-grid"></div>
+    <p class="params-total" id="params-total"></p>
+  </section>
+
+  <section aria-labelledby="flow-head">
+    <div class="section-head">
+      <h2 id="flow-head">② 前向阶段</h2>
+      <span class="tag">forward · 每次 net(input) 都重新执行</span>
+    </div>
+    <p class="section-desc">
+      数据从输入一路流过 conv → relu → pool → conv → relu → pool → flatten → fc → relu → fc → relu → fc。
+      点击任意一步，或用下面的控件播放，看形状如何被一步步推导出来。
+    </p>
+
+    <div class="flow-controls">
+      <button id="btn-playpause" aria-pressed="false">▶ 播放</button>
+      <button id="btn-prev">◂ 上一步</button>
+      <button id="btn-next">下一步 ▸</button>
+      <span class="flow-step-indicator" id="step-indicator">1 / 9</span>
+    </div>
+
+    <div class="flow-rail-wrap" id="rail-wrap">
+      <div class="flow-rail-line"></div>
+      <div class="flow-pulse" id="pulse"></div>
+      <ul class="flow-list" id="flow-list"></ul>
+    </div>
+  </section>
+
+  <footer>
+    图中张量形状统一记作 <code style="font-family: var(--font-mono);">[N, C, H, W]</code>（batch、通道、高、宽）；flatten 之后记作 <code style="font-family: var(--font-mono);">[N, features]</code>。参数量统计口径与 <code style="font-family: var(--font-mono);">net.parameters()</code> 一致（含 bias）。
+  </footer>
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var legendDefs = [
+    { color: "var(--k-input)", label: "输入", kind: "stack" },
+    { color: "var(--k-conv)", label: "卷积 + ReLU", kind: "stack" },
+    { color: "var(--k-pool)", label: "池化", kind: "stack" },
+    { color: "var(--k-fc)", label: "全连接 + ReLU", kind: "dots" },
+    { color: "var(--k-output)", label: "输出", kind: "dots" }
+  ];
+  document.getElementById("legend").innerHTML = legendDefs.map(function (d) {
+    var swatch = d.kind === "dots"
+      ? '<svg class="legend-swatch" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" style="fill:' + d.color + '"/></svg>'
+      : '<svg class="legend-swatch" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2" style="fill:' + d.color + '"/></svg>';
+    return '<span class="legend-item" role="listitem">' + swatch + d.label + "</span>";
+  }).join("");
+
+  // ---- icon builders: colored feature-map stacks (conv/pool/input) and neuron columns (fc/output) ----
+
+  function stackIcon(side, colorVar, size) {
+    var s = side;
+    var off = 5;
+    var base = 28 - s / 2;
+    var mk = function (dx, dy, op) {
+      return '<rect x="' + (base + dx) + '" y="' + (base + dy) + '" width="' + s + '" height="' + s +
+        '" rx="1.5" style="fill:' + colorVar + ';fill-opacity:' + op + ';stroke:' + colorVar + ';stroke-width:1.1"/>';
+    };
+    return (
+      '<svg width="' + (size || 44) + '" height="' + (size || 44) + '" viewBox="0 0 56 56" aria-hidden="true">' +
+      mk(off, -off, 0.18) + mk(off / 2, -off / 2, 0.34) + mk(0, 0, 0.62) +
+      "</svg>"
+    );
+  }
+
+  function gridIcon(colorVar, size) {
+    var cells = "";
+    var n = 4, cell = 8, gap = 1, start = 28 - (n * cell + (n - 1) * gap) / 2;
+    for (var r = 0; r < n; r++) {
+      for (var c = 0; c < n; c++) {
+        cells += '<rect x="' + (start + c * (cell + gap)) + '" y="' + (start + r * (cell + gap)) +
+          '" width="' + cell + '" height="' + cell + '" style="fill:' + colorVar + ';fill-opacity:0.5;stroke:' + colorVar + ';stroke-width:1"/>';
+      }
+    }
+    return '<svg width="' + (size || 44) + '" height="' + (size || 44) + '" viewBox="0 0 56 56" aria-hidden="true">' + cells + "</svg>";
+  }
+
+  function dotsIcon(colorVar, count, size) {
+    var gap = 40 / (count + 1);
+    var circles = "";
+    for (var i = 0; i < count; i++) {
+      circles += '<circle cx="28" cy="' + (8 + gap * (i + 1)) + '" r="4.5" style="fill:' + colorVar + '"/>';
+    }
+    return '<svg width="' + (size || 44) + '" height="' + (size || 44) + '" viewBox="0 0 56 56" aria-hidden="true">' + circles + "</svg>";
+  }
+
+  function fanIcon(fromColorVar, toColorVar, fromCount, toCount) {
+    var leftX = 14, rightX = 42;
+    var fromGap = 44 / (fromCount + 1);
+    var toGap = 44 / (toCount + 1);
+    var fromY = [], toY = [];
+    var i;
+    for (i = 0; i < fromCount; i++) fromY.push(6 + fromGap * (i + 1));
+    for (i = 0; i < toCount; i++) toY.push(6 + toGap * (i + 1));
+    var lines = "";
+    fromY.forEach(function (fy) {
+      toY.forEach(function (ty) {
+        lines += '<line x1="' + leftX + '" y1="' + fy + '" x2="' + rightX + '" y2="' + ty + '" style="stroke:var(--k-line);stroke-width:0.8;opacity:0.55"/>';
+      });
+    });
+    var fromDots = fromY.map(function (fy) { return '<circle cx="' + leftX + '" cy="' + fy + '" r="3.6" style="fill:' + fromColorVar + '"/>'; }).join("");
+    var toDots = toY.map(function (ty) { return '<circle cx="' + rightX + '" cy="' + ty + '" r="4.2" style="fill:' + toColorVar + '"/>'; }).join("");
+    return '<svg width="44" height="44" viewBox="0 0 56 56" aria-hidden="true">' + lines + fromDots + toDots + "</svg>";
+  }
+
+  // ---- animated matrix widgets: sliding window (conv/pool) and dot-product (linear) ----
+
+  // ---- 动态生成 @keyframes：窗口按「行扫描」(raster scan) 走遍真实网格里的每一个真实位置 ----
+  var pendingKeyframes = [];
+  function calcCell(n, maxSize) { return Math.max(3, Math.min(9, Math.floor(maxSize / n))); }
+
+  // cols×rows 个位置，按从左到右、从上到下的顺序生成 2D 位移关键帧；
+  // stepPxX/stepPxY 是窗口每挪一步在输入网格上的像素位移，outStepPxX/outStepPxY 是对应输出格在输出网格上的像素位移。
+  function holdKeyframes2D(name, cols, rows, stepPxX, stepPxY) {
+    var total = cols * rows;
+    var parts = [];
+    var padPct = Math.min(1.2, 100 / total * 0.1);
+    for (var i = 0; i < total; i++) {
+      var row = Math.floor(i / cols), col = i % cols;
+      var startPct = (i / total * 100);
+      var endPct = ((i + 1) / total * 100) - padPct;
+      parts.push(startPct.toFixed(4) + "%, " + endPct.toFixed(4) + "% { transform: translate(" +
+        (col * stepPxX).toFixed(2) + "px, " + (row * stepPxY).toFixed(2) + "px); }");
+    }
+    parts.push("100% { transform: translate(0px, 0px); }");
+    pendingKeyframes.push("@keyframes " + name + " { " + parts.join(" ") + " }");
+  }
+
+  function boundedDuration(totalSteps) { return Math.min(42, Math.max(4, totalSteps * 0.05)).toFixed(2); }
+
+  function gridRects(n, cell, strokeOpacity) {
+    var s = "";
+    for (var r = 0; r < n; r++) {
+      for (var c = 0; c < n; c++) {
+        s += '<rect x="' + (c * cell) + '" y="' + (r * cell) + '" width="' + (cell - 0.6) + '" height="' + (cell - 0.6) +
+          '" style="fill:none;stroke:var(--line);stroke-width:0.4;stroke-opacity:' + strokeOpacity + '"/>';
+      }
+    }
+    return s;
+  }
+
+  function outGridRects(n, cell) {
+    var s = "";
+    for (var r = 0; r < n; r++) {
+      for (var c = 0; c < n; c++) {
+        s += '<rect x="' + (c * cell) + '" y="' + (r * cell) + '" width="' + (cell - 0.8) + '" height="' + (cell - 0.8) +
+          '" rx="0.6" style="fill:var(--surface-2);stroke:var(--line);stroke-width:0.4"/>';
+      }
+    }
+    return s;
+  }
+
+  // 真实尺寸的卷积滑窗：完整画出 inputSize×inputSize 的真实网格（例如 C1 就是真的 32×32），
+  // windowSize×windowSize 的窗口按行扫描滑过每一个真实位置，一共 (inputSize-windowSize+1)^2 个位置。
+  function slideConvWidget(inputSize, windowSize, color, keyPrefix) {
+    var cellIn = calcCell(inputSize, 250);
+    var outCount = inputSize - windowSize + 1;
+    var cellOut = calcCell(outCount, 130);
+    var total = outCount * outCount;
+    var dur = boundedDuration(total);
+    holdKeyframes2D(keyPrefix + "In", outCount, outCount, cellIn, cellIn);
+    holdKeyframes2D(keyPrefix + "Out", outCount, outCount, cellOut, cellOut);
+    var gridW = inputSize * cellIn, outW = outCount * cellOut;
+    var winPx = windowSize * cellIn;
+    var gap = 10;
+    var totalW = gridW + gap + outW;
+    var totalH = Math.max(gridW, outW);
+    return (
+      '<svg width="' + (totalW + 2) + '" height="' + (totalH + 2) + '" viewBox="0 0 ' + (totalW + 2) + ' ' + (totalH + 2) + '" aria-hidden="true" role="img" ' +
+      'aria-label="真实 ' + inputSize + '×' + inputSize + ' 的输入网格，' + windowSize + '×' + windowSize + ' 窗口按行扫描，能滑出 ' + outCount + '×' + outCount + '=' + total + ' 个位置">' +
+      '<g transform="translate(0,0)">' + gridRects(inputSize, cellIn, 0.9) +
+        '<g class="anim-slidewin" style="animation: ' + keyPrefix + 'In ' + dur + 's linear infinite;">' +
+          '<rect x="0" y="0" width="' + (winPx - 1) + '" height="' + (winPx - 1) + '" rx="1.5" style="fill:' + color + ';fill-opacity:0.24;stroke:' + color + ';stroke-width:1.3"/>' +
+        "</g>" +
+      "</g>" +
+      '<g transform="translate(' + (gridW + gap) + ', 0)">' + outGridRects(outCount, cellOut) +
+        '<g class="anim-slideout" style="animation: ' + keyPrefix + 'Out ' + dur + 's linear infinite;">' +
+          '<rect x="0" y="0" width="' + (cellOut - 0.8) + '" height="' + (cellOut - 0.8) + '" rx="1" style="fill:none;stroke:' + color + ';stroke-width:1.6"/>' +
+        "</g>" +
+      "</g>" +
+      "</svg>"
+    );
+  }
+
+  // 真实尺寸的池化跳窗：完整画出 inputSize×inputSize 的真实网格，windowSize×windowSize 的窗口
+  // 按自身宽度整块跳（不重叠）、按行扫描走遍每一组，一共 (inputSize/windowSize)^2 组。
+  function slidePoolWidget(inputSize, windowSize, color, keyPrefix) {
+    var cellIn = calcCell(inputSize, 250);
+    var outCount = inputSize / windowSize;
+    var cellOut = calcCell(outCount, 100);
+    var total = outCount * outCount;
+    var dur = boundedDuration(total * 1.4);
+    holdKeyframes2D(keyPrefix + "In", outCount, outCount, windowSize * cellIn, windowSize * cellIn);
+    holdKeyframes2D(keyPrefix + "Out", outCount, outCount, cellOut, cellOut);
+    var gridW = inputSize * cellIn, outW = outCount * cellOut;
+    var winPx = windowSize * cellIn;
+    var gap = 10;
+    var totalW = gridW + gap + outW;
+    var totalH = Math.max(gridW, outW);
+    return (
+      '<svg width="' + (totalW + 2) + '" height="' + (totalH + 2) + '" viewBox="0 0 ' + (totalW + 2) + ' ' + (totalH + 2) + '" aria-hidden="true" role="img" ' +
+      'aria-label="真实 ' + inputSize + '×' + inputSize + ' 的输入网格，' + windowSize + '×' + windowSize + ' 窗口不重叠跳格，按行扫描共 ' + outCount + '×' + outCount + ' 组">' +
+      '<g transform="translate(0,0)">' + gridRects(inputSize, cellIn, 0.9) +
+        '<g class="anim-slidewin" style="animation: ' + keyPrefix + 'In ' + dur + 's steps(1,end) infinite;">' +
+          '<rect x="0" y="0" width="' + (winPx - 1) + '" height="' + (winPx - 1) + '" rx="1.5" style="fill:' + color + ';fill-opacity:0.3;stroke:' + color + ';stroke-width:1.3"/>' +
+        "</g>" +
+      "</g>" +
+      '<g transform="translate(' + (gridW + gap) + ', 0)">' + outGridRects(outCount, cellOut) +
+        '<g class="anim-slideout" style="animation: ' + keyPrefix + 'Out ' + dur + 's steps(1,end) infinite;">' +
+          '<rect x="0" y="0" width="' + (cellOut - 0.8) + '" height="' + (cellOut - 0.8) + '" rx="1" style="fill:none;stroke:' + color + ';stroke-width:1.6"/>' +
+        "</g>" +
+      "</g>" +
+      "</svg>"
+    );
+  }
+
+  function dotProductWidget(color) {
+    var n = 5, leftX = 4, rightX = 60, top = 4, gap = 8;
+    var lines = "", dots = "";
+    for (var i = 0; i < n; i++) {
+      var y = top + i * gap;
+      var delay = (i * 0.4).toFixed(1);
+      lines += '<line x1="' + leftX + '" y1="' + y + '" x2="' + rightX + '" y2="' + (top + (n - 1) * gap / 2) +
+        '" class="anim-line" style="stroke:' + color + ';animation: flowDotPulse 3s linear infinite; animation-delay:' + delay + 's;"/>';
+      dots += '<circle cx="' + leftX + '" cy="' + y + '" r="2.6" style="fill:var(--ink-faint)"/>';
+    }
+    dots += '<text x="' + leftX + '" y="' + (top + n * gap + 6) + '" font-size="9" style="fill:var(--ink-faint)">&#8942; 共 in_features 项</text>';
+    var outY = top + (n - 1) * gap / 2;
+    return (
+      '<svg width="100%" height="64" viewBox="0 0 130 64" aria-hidden="true" role="img" aria-label="输入向量的每一项乘以对应权重后累加，得到一个输出值">' +
+      lines + dots +
+      '<circle cx="' + rightX + '" cy="' + outY + '" r="4.6" class="anim-outdot" style="fill:' + color + ';animation: flowDotOut 3s linear infinite;"/>' +
+      "</svg>"
+    );
+  }
+
+  var layers = [
+    {
+      name: "conv1", icon: stackIcon(14, "var(--k-conv)", 28),
+      code: "nn.Conv2d(1, 6, 5)",
+      args: "in_channels=1, out_channels=6, kernel_size=5",
+      wLabel: "weight [6, 1, 5, 5]", wCalcLabel: "out_channels(6) × in_channels(1) × kH(5) × kW(5)", wCalc: "= 150",
+      bLabel: "bias [6]", bCalcLabel: "out_channels(6)", bCalc: "= 6",
+      fanIn: "in_channels × kH × kW = 1×5×5 = 25", bound: "0.2000",
+      role: "输入 1 个通道（灰度图），6 个 5×5 卷积核滑过全图，提取边缘一类的初级特征。",
+      total: 156
+    },
+    {
+      name: "conv2", icon: stackIcon(14, "var(--k-conv)", 28),
+      code: "nn.Conv2d(6, 16, 5)",
+      args: "in_channels=6, out_channels=16, kernel_size=5",
+      wLabel: "weight [16, 6, 5, 5]", wCalcLabel: "out_channels(16) × in_channels(6) × kH(5) × kW(5)", wCalc: "= 2400",
+      bLabel: "bias [16]", bCalcLabel: "out_channels(16)", bCalc: "= 16",
+      fanIn: "in_channels × kH × kW = 6×5×5 = 150", bound: "0.0816",
+      role: "输入上一层的 6 个通道，16 个卷积核把初级特征组合成更抽象的特征。",
+      total: 2416
+    },
+    {
+      name: "fc1", icon: dotsIcon("var(--k-fc)", 4, 28),
+      code: "nn.Linear(400, 120)",
+      args: "in_features=400, out_features=120",
+      wLabel: "weight [120, 400]", wCalcLabel: "out_features(120) × in_features(400)", wCalc: "= 48000",
+      bLabel: "bias [120]", bCalcLabel: "out_features(120)", bCalc: "= 120",
+      fanIn: "in_features = 400", bound: "0.0500",
+      role: "把 flatten 后的 400 维特征向量仿射投影到 120 维。",
+      total: 48120
+    },
+    {
+      name: "fc2", icon: dotsIcon("var(--k-fc)", 4, 28),
+      code: "nn.Linear(120, 84)",
+      args: "in_features=120, out_features=84",
+      wLabel: "weight [84, 120]", wCalcLabel: "out_features(84) × in_features(120)", wCalc: "= 10080",
+      bLabel: "bias [84]", bCalcLabel: "out_features(84)", bCalc: "= 84",
+      fanIn: "in_features = 120", bound: "0.0913",
+      role: "120 维继续压缩到 84 维。",
+      total: 10164
+    },
+    {
+      name: "fc3", icon: dotsIcon("var(--k-output)", 3, 28),
+      code: "nn.Linear(84, 10)",
+      args: "in_features=84, out_features=10",
+      wLabel: "weight [10, 84]", wCalcLabel: "out_features(10) × in_features(84)", wCalc: "= 840",
+      bLabel: "bias [10]", bCalcLabel: "out_features(10)", bCalc: "= 10",
+      fanIn: "in_features = 84", bound: "0.1091",
+      role: "84 维投影到 10 维，对应 10 个类别的原始分数（logits）。",
+      total: 850
+    }
+  ];
+
+  var grid = document.getElementById("layer-grid");
+  var totalParams = 0;
+  layers.forEach(function (l, idx) {
+    totalParams += l.total;
+    var card = document.createElement("div");
+    card.className = "layer-card";
+    card.innerHTML =
+      '<div class="step">STEP ' + (idx + 1) + " / " + layers.length + "</div>" +
+      '<div class="name-row"><div class="flow-icon-wrap" style="width:28px;height:28px;border-radius:6px;">' + l.icon + '</div><p class="name">' + l.name + "</p></div>" +
+      '<code class="code">' + l.code + "</code>" +
+      '<p class="args">' + l.args + "</p>" +
+      '<div class="row"><span>' + l.wLabel + '<span class="calc-label">' + l.wCalcLabel + '</span></span><span class="val">' + l.wCalc + "</span></div>" +
+      '<div class="row"><span>' + l.bLabel + '<span class="calc-label">' + l.bCalcLabel + '</span></span><span class="val">' + l.bCalc + "</span></div>" +
+      '<div class="params">weight + bias = ' + l.total.toLocaleString() + " 个参数</div>" +
+      '<p class="init"><b>初始化</b>（kaiming_uniform_）：fan_in = ' + l.fanIn + '<br>weight, bias ~ U(&minus;' + l.bound + ", " + l.bound + ")</p>" +
+      '<p class="role">' + l.role + "</p>";
+    grid.appendChild(card);
+  });
+  document.getElementById("params-total").innerHTML =
+    "5 层合计 &nbsp;<b>" + totalParams.toLocaleString() + "</b>&nbsp; 个可学习参数 · len(net.parameters()) == 10";
+
+  var stages = [
+    { title: "输入", shape: "[1, 1, 32, 32]", icon: gridIcon("var(--k-input)"), note: "batch = 1，单通道灰度图，32×32 像素", op: null,
+      compute: "只是把原始像素值封装成张量，还没有发生任何乘法或加法运算。" },
+    { title: "C1", shape: "[1, 6, 28, 28]", icon: stackIcon(30, "var(--k-conv)"), op: "F.relu(self.conv1(x))", formula: "(32 − 5) / 1 + 1 = 28", note: "6 个 5×5 卷积核扫过输入 → 6 张特征图，relu 激活",
+      derive: "5×5 窗口不能超出输入边界，起始位置最多到 32 − 5 = 27；起始位置范围 0~27 共 <code>27 − 0 + 1 = 28</code> 个（费斯特计数：数格子而不是数间隔）——这就是公式里 <code>−5</code> 和末尾 <code>+1</code> 的来源。padding=0、stride=1 都用的是 Conv2d 默认值。",
+      compute: "每个输出数值的计算公式：<code>c1[co,i,j] = relu( bias[co] + Σ(kh=0..4, kw=0..4) weight[co,0,kh,kw] × input[0, i+kh, j+kw] )</code>，其中 <code>co=0..5, i,j=0..27</code>——对每个 (co,i,j) 都要做 25 次乘法 + 24 次加法再 +bias。逐个位置代入，一共 6×28×28=4704 次，合计约 <code>117,600</code> 次乘加，再逐元素 relu。",
+      matrix: slideConvWidget(32, 5, "var(--k-conv)", "kfC1"), matrixCaption: "真实尺寸：完整的 32×32 输入网格，5×5 窗口按行扫描滑过每一个位置，共 28×28=784 个位置——对应右边真实的 28×28 输出网格，窗口滑到哪，就点亮哪一格输出" },
+    { title: "S2", shape: "[1, 6, 14, 14]", icon: stackIcon(20, "var(--k-pool)"), op: "F.max_pool2d(c1, (2, 2))", formula: "28 / 2 = 14", note: "2×2 窗口取最大值，下采样、减小计算量",
+      derive: "池化窗口大小和步长都是 2（stride = kernel_size），窗口<b>不重叠</b>地滑动——相当于把 28 个格子每 2 个分一组，直接 <code>28 / 2 = 14</code> 组，不需要像卷积那样做费斯特计数（因为没有重叠、没有余量）。",
+      compute: "每个输出数值的计算公式：<code>s2[c,i,j] = max( c1[c,2i,2j], c1[c,2i,2j+1], c1[c,2i+1,2j], c1[c,2i+1,2j+1] )</code>，其中 <code>c=0..5, i,j=0..13</code>——只在这 4 个数里比较取最大值，逐位置代入共 6×14×14=1176 次比较。<b>这一步不属于加减乘除四则运算的任何一种，用的是比较运算 max()</b>：4 个数里直接选一个出来，不产生新数值，也没有可学习参数。",
+      matrix: slidePoolWidget(28, 2, "var(--k-pool)", "kfS2"), matrixCaption: "真实尺寸：完整的 28×28 输入网格，2×2 窗口整块跳格（不重叠），按行扫描共 14×14=196 组——对比 C1 可以看到窗口是「跳」不是「滑」" },
+    { title: "C3", shape: "[1, 16, 10, 10]", icon: stackIcon(17, "var(--k-conv)"), op: "F.relu(self.conv2(s2))", formula: "(14 − 5) / 1 + 1 = 10", note: "16 个 5×5 卷积核，通道数 6 → 16，特征更抽象",
+      derive: "和 C1 同一个公式，只是输入尺寸从 32 变成了 14：起始位置最多到 14 − 5 = 9，范围 0~9 共 <code>9 − 0 + 1 = 10</code> 个。",
+      compute: "每个输出数值的计算公式：<code>c3[co,i,j] = relu( bias[co] + Σ(ci=0..5, kh=0..4, kw=0..4) weight[co,ci,kh,kw] × s2[ci, i+kh, j+kw] )</code>，其中 <code>co=0..15, i,j=0..9</code>——每个位置要在 6×5×5=150 个输入数上做乘加求和再 +bias。逐位置代入，16×10×10=1600 次，合计约 <code>24 万</code> 次乘加，再逐元素 relu。",
+      matrix: slideConvWidget(14, 5, "var(--k-conv)", "kfC3"), matrixCaption: "真实尺寸：完整的 14×14 输入网格，5×5 窗口按行扫描，共 10×10=100 个位置——原理和 C1 一样，只是这次窗口要同时扫过 6 个输入通道（图里省略了通道维度）" },
+    { title: "S4", shape: "[1, 16, 5, 5]", icon: stackIcon(13, "var(--k-pool)"), op: "F.max_pool2d(c3, 2)", formula: "10 / 2 = 5", note: "第二次下采样",
+      derive: "和 S2 同一个原理：10 个格子不重叠地每 2 个分一组，<code>10 / 2 = 5</code> 组。",
+      compute: "每个输出数值的计算公式：<code>s4[c,i,j] = max( c3[c,2i,2j], c3[c,2i,2j+1], c3[c,2i+1,2j], c3[c,2i+1,2j+1] )</code>，其中 <code>c=0..15, i,j=0..4</code>——逐位置代入共 16×5×5=400 次比较。<b>同样不属于加减乘除，是比较运算 max()</b>，没有乘加。",
+      matrix: slidePoolWidget(10, 2, "var(--k-pool)", "kfS4"), matrixCaption: "真实尺寸：完整的 10×10 输入网格，2×2 窗口跳格，共 5×5=25 组——和 S2 同一个逻辑，只是输入换成了 C3 的输出" },
+    { title: "flatten", shape: "[1, 400]", icon: dotsIcon("var(--ink-faint)", 5), op: "torch.flatten(s4, 1)", formula: "16 × 5 × 5 = 400", note: "拍平成一维向量，保留 batch 维（灰点表示：只是重排形状，还没有学习任何权重）—— 这就是 fc1 输入维度的来源",
+      derive: "不是滑动计数，是单纯数元素个数：形状 <code>[16, 5, 5]</code> 里一共有 <code>16 × 5 × 5 = 400</code> 个数，把它们按顺序排成一条向量。",
+      compute: "只是把同一块内存重新按 <code>[1, 400]</code> 解释——这一步<b>没有任何乘法或加法</b>，纯粹是形状上的重新标注，9 步里唯一不涉及数值计算的一步。" },
+    { title: "F5", shape: "[1, 120]", icon: dotsIcon("var(--k-fc)", 5), op: "F.relu(self.fc1(s4))", formula: "Linear(400 → 120)", note: "仿射变换 y = Wx + b，relu 激活",
+      compute: "每个输出数值的计算公式：<code>f5[k] = relu( bias[k] + Σ(m=0..399) weight[k,m] × s4[m] )</code>，其中 <code>k=0..119</code>——每个输出要在 400 个输入数上做乘加求和再 +bias（400 次乘法 + 400 次加法）。逐个 k 代入，120×400=<code>48,000</code> 次乘加，再逐元素 relu。",
+      matrix: dotProductWidget("var(--k-fc)"), matrixCaption: "示意：只画出 5 项，实际是 400 项——每一条线依次「点亮」代表一次乘加被累加进右边的输出值" },
+    { title: "F6", shape: "[1, 84]", icon: dotsIcon("var(--k-fc)", 5), op: "F.relu(self.fc2(f5))", formula: "Linear(120 → 84)", note: "仿射变换 + relu",
+      compute: "每个输出数值的计算公式：<code>f6[k] = relu( bias[k] + Σ(m=0..119) weight[k,m] × f5[m] )</code>，其中 <code>k=0..83</code>——逐个 k 代入，84×120=<code>10,080</code> 次乘加，再逐元素 relu。",
+      matrix: dotProductWidget("var(--k-fc)"), matrixCaption: "示意：只画出 5 项，实际是 120 项" },
+    { title: "输出", shape: "[1, 10]", icon: fanIcon("var(--k-fc)", "var(--k-output)", 4, 3), op: "self.fc3(f6)", formula: "Linear(84 → 10)", note: "10 个类别的原始分数（logits），不加 softmax",
+      compute: "每个输出数值的计算公式：<code>output[k] = bias[k] + Σ(m=0..83) weight[k,m] × f6[m]</code>，其中 <code>k=0..9</code>——逐个 k 代入，10×84=<code>840</code> 次乘加，直接作为 logits 输出，不经过 relu。",
+      matrix: dotProductWidget("var(--k-output)"), matrixCaption: "示意：只画出 5 项，实际是 84 项——这是 10 个输出神经元里的其中 1 个" }
+  ];
+
+  if (pendingKeyframes.length) {
+    var kfStyle = document.createElement("style");
+    kfStyle.textContent = pendingKeyframes.join("\n");
+    document.head.appendChild(kfStyle);
+  }
+
+  var list = document.getElementById("flow-list");
+  stages.forEach(function (s, i) {
+    var li = document.createElement("li");
+    li.className = "flow-item";
+    li.dataset.index = i;
+    var opHtml = s.op
+      ? '<div class="flow-op">' + s.op + "</div>"
+      : "";
+    var formulaHtml = s.formula
+      ? '<span class="flow-formula">' + s.formula + "</span>"
+      : "";
+    var deriveHtml = s.derive
+      ? '<div class="flow-derive"><span class="lbl">形状推导原理</span>' + s.derive + "</div>"
+      : "";
+    var computeHtml = s.compute
+      ? '<div class="flow-compute"><span class="lbl">张量计算过程</span>' + s.compute + "</div>"
+      : "";
+    var matrixHtml = s.matrix
+      ? '<div class="flow-matrix"><span class="lbl">矩阵动态示意</span>' + s.matrix +
+        (s.matrixCaption ? '<p class="flow-note" style="margin-top:6px;font-size:12px;">' + s.matrixCaption + "</p>" : "") +
+        "</div>"
+      : "";
+    li.innerHTML =
+      '<div class="flow-node"><div class="dot"></div></div>' +
+      '<div class="flow-card">' +
+        '<div class="flow-top"><div class="flow-icon-wrap">' + s.icon + "</div>" +
+          '<div><div class="flow-step">STEP ' + (i + 1) + " / " + stages.length + '</div>' +
+          '<div class="flow-title">' + s.title + "</div></div>" +
+        "</div>" +
+        opHtml +
+        '<div class="flow-body-row"><span class="flow-shape">' + s.shape + "</span>" + formulaHtml + "</div>" +
+        '<p class="flow-note">' + s.note + "</p>" +
+        deriveHtml +
+        computeHtml +
+        matrixHtml +
+      "</div>";
+    list.appendChild(li);
+  });
+
+  var items = Array.prototype.slice.call(document.querySelectorAll(".flow-item"));
+  var pulse = document.getElementById("pulse");
+  var railWrap = document.getElementById("rail-wrap");
+  var indicator = document.getElementById("step-indicator");
+  var current = 0;
+  var playing = false;
+  var timer = null;
+
+  function positionPulse() {
+    var node = items[current].querySelector(".flow-node");
+    var top = node.offsetTop + node.offsetHeight / 2 - 9;
+    pulse.style.top = top + "px";
+  }
+
+  function render() {
+    items.forEach(function (li, i) {
+      li.classList.toggle("is-active", i === current);
+    });
+    indicator.textContent = (current + 1) + " / " + items.length;
+    positionPulse();
+  }
+
+  function goTo(i) {
+    current = Math.max(0, Math.min(items.length - 1, i));
+    render();
+  }
+
+  function step() {
+    if (current >= items.length - 1) {
+      current = 0;
+    } else {
+      current += 1;
+    }
+    render();
+  }
+
+  var playBtn = document.getElementById("btn-playpause");
+  function setPlaying(next) {
+    playing = next;
+    playBtn.textContent = playing ? "⏸ 暂停" : "▶ 播放";
+    playBtn.setAttribute("aria-pressed", String(playing));
+    if (timer) { clearInterval(timer); timer = null; }
+    if (playing) {
+      timer = setInterval(step, 1700);
+    }
+  }
+
+  playBtn.addEventListener("click", function () { setPlaying(!playing); });
+  document.getElementById("btn-prev").addEventListener("click", function () { setPlaying(false); goTo(current - 1); });
+  document.getElementById("btn-next").addEventListener("click", function () { setPlaying(false); goTo(current + 1); });
+  items.forEach(function (li, i) {
+    li.addEventListener("click", function () { setPlaying(false); goTo(i); });
+  });
+
+  window.addEventListener("resize", positionPulse);
+  window.addEventListener("load", positionPulse);
+  requestAnimationFrame(render);
+  setTimeout(render, 60);
+})();
+</script>
+</body>
+</html>
