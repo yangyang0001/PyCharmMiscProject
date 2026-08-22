@@ -361,6 +361,48 @@
     font-variant-numeric: tabular-nums;
   }
 
+  .mnemo-strip {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 3px;
+    margin: 4px 0 0;
+    font-family: var(--font-mono);
+    font-size: 13px;
+  }
+  .mnemo-seg {
+    display: inline-flex;
+    padding: 2px 6px;
+    border-radius: 5px;
+    border: 1px solid transparent;
+    color: var(--ink-faint);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    transition: color 0.3s, border-color 0.3s, background 0.3s;
+  }
+  .mnemo-seg.is-active {
+    color: var(--seg-color, var(--signal-strong));
+    border-color: var(--seg-color, var(--signal));
+    background: var(--signal-soft);
+  }
+  .mnemo-sep {
+    color: var(--ink-faint);
+    opacity: 0.5;
+    font-size: 11px;
+  }
+
+  .flow-mnemo {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--ink-faint);
+    background: var(--surface-2);
+    border-radius: 4px;
+    padding: 1px 6px;
+    letter-spacing: 0.03em;
+    margin-left: 6px;
+  }
+
   .flow-rail-wrap {
     position: relative;
     padding-left: 4px;
@@ -496,6 +538,15 @@
     white-space: nowrap;
   }
 
+  .flow-formula-lbl {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 400;
+    letter-spacing: 0.06em;
+    color: var(--ink-faint);
+    margin-right: 6px;
+  }
+
   .flow-formula {
     font-family: var(--font-mono);
     font-size: 13px;
@@ -626,6 +677,10 @@
       数据从输入一路流过 conv → relu → pool → conv → relu → pool → flatten → fc → relu → fc → relu → fc。
       点击任意一步，或用下面的控件播放，看形状如何被一步步推导出来。
     </p>
+    <p class="section-desc" style="margin-top:-14px;">
+      助记：<b style="color:var(--ink);">C</b>onv-<b style="color:var(--ink);">R</b>elu-<b style="color:var(--ink);">P</b>ool 两轮，展平后三个<b style="color:var(--ink);">F</b>c，前两个带 <b style="color:var(--ink);">R</b>elu、最后一个不带——跟着播放走一遍，看下面高亮的字母跟当前步骤对上。
+    </p>
+    <div class="mnemo-strip" id="mnemo-strip"></div>
 
     <div class="flow-controls">
       <button id="btn-playpause" aria-pressed="false">▶ 播放</button>
@@ -928,34 +983,34 @@
     "5 层合计 &nbsp;<b>" + totalParams.toLocaleString() + "</b>&nbsp; 个可学习参数 · len(net.parameters()) == 10";
 
   var stages = [
-    { title: "输入", shape: "[1, 1, 32, 32]", icon: gridIcon("var(--k-input)"), note: "batch = 1，单通道灰度图，32×32 像素", op: null,
+    { title: "输入", shape: "[1, 1, 32, 32]", icon: gridIcon("var(--k-input)"), mnemo: null, mnemoColor: "var(--k-input)", note: "batch = 1，单通道灰度图，32×32 像素", op: null,
       compute: "只是把原始像素值封装成张量，还没有发生任何乘法或加法运算。" },
-    { title: "C1", shape: "[1, 6, 28, 28]", icon: stackIcon(30, "var(--k-conv)"), op: "F.relu(self.conv1(x))", formula: "(32 − 5) / 1 + 1 = 28", note: "6 个 5×5 卷积核扫过输入 → 6 张特征图，relu 激活",
-      derive: "5×5 窗口不能超出输入边界，起始位置最多到 32 − 5 = 27；起始位置范围 0~27 共 <code>27 − 0 + 1 = 28</code> 个（费斯特计数：数格子而不是数间隔）——这就是公式里 <code>−5</code> 和末尾 <code>+1</code> 的来源。padding=0、stride=1 都用的是 Conv2d 默认值。",
+    { title: "C1", shape: "[1, 6, 28, 28]", icon: stackIcon(30, "var(--k-conv)"), mnemo: "C R", mnemoColor: "var(--k-conv)", op: "F.relu(self.conv1(x))", formula: "(32 − 5) / 1 + 1 = 28", note: "6 个 5×5 卷积核扫过输入 → 6 张特征图，relu 激活",
+      derive: "5×5 窗口不能超出输入边界，起始位置最多到 32 − 5 = 27；起始位置范围 0~27 共 <code>27 − 0 + 1 = 28</code> 个（费斯特计数：数格子而不是数间隔）——这就是公式里 <code>−5</code> 和末尾 <code>+1</code> 的来源。padding=0、stride=1 都用的是 Conv2d 默认值。通用公式：<code>out = ⌊(in − kernel + 2×padding) / stride⌋ + 1</code>，把 in=32, kernel=5, padding=0, stride=1 代入就是 <code>(32 − 5 + 0) / 1 + 1 = 28</code>。",
       compute: "每个输出数值的计算公式：<code>c1[co,i,j] = relu( bias[co] + Σ(kh=0..4, kw=0..4) weight[co,0,kh,kw] × input[0, i+kh, j+kw] )</code>，其中 <code>co=0..5, i,j=0..27</code>——对每个 (co,i,j) 都要做 25 次乘法 + 24 次加法再 +bias。逐个位置代入，一共 6×28×28=4704 次，合计约 <code>117,600</code> 次乘加，再逐元素 relu。",
       matrix: slideConvWidget(32, 5, "var(--k-conv)", "kfC1"), matrixCaption: "真实尺寸：完整的 32×32 输入网格，5×5 窗口按行扫描滑过每一个位置，共 28×28=784 个位置——对应右边真实的 28×28 输出网格，窗口滑到哪，就点亮哪一格输出" },
-    { title: "S2", shape: "[1, 6, 14, 14]", icon: stackIcon(20, "var(--k-pool)"), op: "F.max_pool2d(c1, (2, 2))", formula: "28 / 2 = 14", note: "2×2 窗口取最大值，下采样、减小计算量",
-      derive: "池化窗口大小和步长都是 2（stride = kernel_size），窗口<b>不重叠</b>地滑动——相当于把 28 个格子每 2 个分一组，直接 <code>28 / 2 = 14</code> 组，不需要像卷积那样做费斯特计数（因为没有重叠、没有余量）。",
+    { title: "S2", shape: "[1, 6, 14, 14]", icon: stackIcon(20, "var(--k-pool)"), mnemo: "P", mnemoColor: "var(--k-pool)", op: "F.max_pool2d(c1, (2, 2))", formula: "28 / 2 = 14", note: "2×2 窗口取最大值，下采样、减小计算量",
+      derive: "池化窗口大小和步长都是 2（stride = kernel_size），窗口<b>不重叠</b>地滑动——相当于把 28 个格子每 2 个分一组，直接 <code>28 / 2 = 14</code> 组，不需要像卷积那样做费斯特计数（因为没有重叠、没有余量）。通用公式仍是 <code>out = ⌊(in − kernel + 2×padding) / stride⌋ + 1</code>，只是这里 <code>stride = kernel = 2, padding = 0</code>，代入化简后就退化成整除 <code>in / kernel</code>。",
       compute: "每个输出数值的计算公式：<code>s2[c,i,j] = max( c1[c,2i,2j], c1[c,2i,2j+1], c1[c,2i+1,2j], c1[c,2i+1,2j+1] )</code>，其中 <code>c=0..5, i,j=0..13</code>——只在这 4 个数里比较取最大值，逐位置代入共 6×14×14=1176 次比较。<b>这一步不属于加减乘除四则运算的任何一种，用的是比较运算 max()</b>：4 个数里直接选一个出来，不产生新数值，也没有可学习参数。",
       matrix: slidePoolWidget(28, 2, "var(--k-pool)", "kfS2"), matrixCaption: "真实尺寸：完整的 28×28 输入网格，2×2 窗口整块跳格（不重叠），按行扫描共 14×14=196 组——对比 C1 可以看到窗口是「跳」不是「滑」" },
-    { title: "C3", shape: "[1, 16, 10, 10]", icon: stackIcon(17, "var(--k-conv)"), op: "F.relu(self.conv2(s2))", formula: "(14 − 5) / 1 + 1 = 10", note: "16 个 5×5 卷积核，通道数 6 → 16，特征更抽象",
+    { title: "C3", shape: "[1, 16, 10, 10]", icon: stackIcon(17, "var(--k-conv)"), mnemo: "C R", mnemoColor: "var(--k-conv)", op: "F.relu(self.conv2(s2))", formula: "(14 − 5) / 1 + 1 = 10", note: "16 个 5×5 卷积核，通道数 6 → 16，特征更抽象",
       derive: "和 C1 同一个公式，只是输入尺寸从 32 变成了 14：起始位置最多到 14 − 5 = 9，范围 0~9 共 <code>9 − 0 + 1 = 10</code> 个。",
       compute: "每个输出数值的计算公式：<code>c3[co,i,j] = relu( bias[co] + Σ(ci=0..5, kh=0..4, kw=0..4) weight[co,ci,kh,kw] × s2[ci, i+kh, j+kw] )</code>，其中 <code>co=0..15, i,j=0..9</code>——每个位置要在 6×5×5=150 个输入数上做乘加求和再 +bias。逐位置代入，16×10×10=1600 次，合计约 <code>24 万</code> 次乘加，再逐元素 relu。",
       matrix: slideConvWidget(14, 5, "var(--k-conv)", "kfC3"), matrixCaption: "真实尺寸：完整的 14×14 输入网格，5×5 窗口按行扫描，共 10×10=100 个位置——原理和 C1 一样，只是这次窗口要同时扫过 6 个输入通道（图里省略了通道维度）" },
-    { title: "S4", shape: "[1, 16, 5, 5]", icon: stackIcon(13, "var(--k-pool)"), op: "F.max_pool2d(c3, 2)", formula: "10 / 2 = 5", note: "第二次下采样",
+    { title: "S4", shape: "[1, 16, 5, 5]", icon: stackIcon(13, "var(--k-pool)"), mnemo: "P", mnemoColor: "var(--k-pool)", op: "F.max_pool2d(c3, 2)", formula: "10 / 2 = 5", note: "第二次下采样",
       derive: "和 S2 同一个原理：10 个格子不重叠地每 2 个分一组，<code>10 / 2 = 5</code> 组。",
       compute: "每个输出数值的计算公式：<code>s4[c,i,j] = max( c3[c,2i,2j], c3[c,2i,2j+1], c3[c,2i+1,2j], c3[c,2i+1,2j+1] )</code>，其中 <code>c=0..15, i,j=0..4</code>——逐位置代入共 16×5×5=400 次比较。<b>同样不属于加减乘除，是比较运算 max()</b>，没有乘加。",
       matrix: slidePoolWidget(10, 2, "var(--k-pool)", "kfS4"), matrixCaption: "真实尺寸：完整的 10×10 输入网格，2×2 窗口跳格，共 5×5=25 组——和 S2 同一个逻辑，只是输入换成了 C3 的输出" },
-    { title: "flatten", shape: "[1, 400]", icon: dotsIcon("var(--ink-faint)", 5), op: "torch.flatten(s4, 1)", formula: "16 × 5 × 5 = 400", note: "拍平成一维向量，保留 batch 维（灰点表示：只是重排形状，还没有学习任何权重）—— 这就是 fc1 输入维度的来源",
+    { title: "flatten", shape: "[1, 400]", icon: dotsIcon("var(--ink-faint)", 5), mnemo: "F", mnemoColor: "var(--ink-faint)", op: "torch.flatten(s4, 1)", formula: "16 × 5 × 5 = 400", note: "拍平成一维向量，保留 batch 维（灰点表示：只是重排形状，还没有学习任何权重）—— 这就是 fc1 输入维度的来源",
       derive: "不是滑动计数，是单纯数元素个数：形状 <code>[16, 5, 5]</code> 里一共有 <code>16 × 5 × 5 = 400</code> 个数，把它们按顺序排成一条向量。",
       compute: "只是把同一块内存重新按 <code>[1, 400]</code> 解释——这一步<b>没有任何乘法或加法</b>，纯粹是形状上的重新标注，9 步里唯一不涉及数值计算的一步。" },
-    { title: "F5", shape: "[1, 120]", icon: dotsIcon("var(--k-fc)", 5), op: "F.relu(self.fc1(s4))", formula: "Linear(400 → 120)", note: "仿射变换 y = Wx + b，relu 激活",
+    { title: "F5", shape: "[1, 120]", icon: dotsIcon("var(--k-fc)", 5), mnemo: "F R", mnemoColor: "var(--k-fc)", op: "F.relu(self.fc1(s4))", formula: "Linear(400 → 120)", note: "仿射变换 y = Wx + b，relu 激活",
       compute: "每个输出数值的计算公式：<code>f5[k] = relu( bias[k] + Σ(m=0..399) weight[k,m] × s4[m] )</code>，其中 <code>k=0..119</code>——每个输出要在 400 个输入数上做乘加求和再 +bias（400 次乘法 + 400 次加法）。逐个 k 代入，120×400=<code>48,000</code> 次乘加，再逐元素 relu。",
       matrix: dotProductWidget("var(--k-fc)"), matrixCaption: "示意：只画出 5 项，实际是 400 项——每一条线依次「点亮」代表一次乘加被累加进右边的输出值" },
-    { title: "F6", shape: "[1, 84]", icon: dotsIcon("var(--k-fc)", 5), op: "F.relu(self.fc2(f5))", formula: "Linear(120 → 84)", note: "仿射变换 + relu",
+    { title: "F6", shape: "[1, 84]", icon: dotsIcon("var(--k-fc)", 5), mnemo: "F R", mnemoColor: "var(--k-fc)", op: "F.relu(self.fc2(f5))", formula: "Linear(120 → 84)", note: "仿射变换 + relu",
       compute: "每个输出数值的计算公式：<code>f6[k] = relu( bias[k] + Σ(m=0..119) weight[k,m] × f5[m] )</code>，其中 <code>k=0..83</code>——逐个 k 代入，84×120=<code>10,080</code> 次乘加，再逐元素 relu。",
       matrix: dotProductWidget("var(--k-fc)"), matrixCaption: "示意：只画出 5 项，实际是 120 项" },
-    { title: "输出", shape: "[1, 10]", icon: fanIcon("var(--k-fc)", "var(--k-output)", 4, 3), op: "self.fc3(f6)", formula: "Linear(84 → 10)", note: "10 个类别的原始分数（logits），不加 softmax",
+    { title: "输出", shape: "[1, 10]", icon: fanIcon("var(--k-fc)", "var(--k-output)", 4, 3), mnemo: "F", mnemoColor: "var(--k-output)", op: "self.fc3(f6)", formula: "Linear(84 → 10)", note: "10 个类别的原始分数（logits），不加 softmax",
       compute: "每个输出数值的计算公式：<code>output[k] = bias[k] + Σ(m=0..83) weight[k,m] × f6[m]</code>，其中 <code>k=0..9</code>——逐个 k 代入，10×84=<code>840</code> 次乘加，直接作为 logits 输出，不经过 relu。",
       matrix: dotProductWidget("var(--k-output)"), matrixCaption: "示意：只画出 5 项，实际是 84 项——这是 10 个输出神经元里的其中 1 个" }
   ];
@@ -975,7 +1030,7 @@
       ? '<div class="flow-op">' + s.op + "</div>"
       : "";
     var formulaHtml = s.formula
-      ? '<span class="flow-formula">' + s.formula + "</span>"
+      ? '<span class="flow-formula"><span class="flow-formula-lbl">计算公式</span>' + s.formula + "</span>"
       : "";
     var deriveHtml = s.derive
       ? '<div class="flow-derive"><span class="lbl">形状推导原理</span>' + s.derive + "</div>"
@@ -993,7 +1048,9 @@
       '<div class="flow-card">' +
         '<div class="flow-top"><div class="flow-icon-wrap">' + s.icon + "</div>" +
           '<div><div class="flow-step">STEP ' + (i + 1) + " / " + stages.length + '</div>' +
-          '<div class="flow-title">' + s.title + "</div></div>" +
+          '<div class="flow-title">' + s.title +
+          (s.mnemo ? ' <span class="flow-mnemo" style="color:' + s.mnemoColor + '">' + s.mnemo.replace(/ /g, "·") + "</span>" : "") +
+          "</div></div>" +
         "</div>" +
         opHtml +
         '<div class="flow-body-row"><span class="flow-shape">' + s.shape + "</span>" + formulaHtml + "</div>" +
@@ -1004,6 +1061,19 @@
       "</div>";
     list.appendChild(li);
   });
+
+  // 助记词分组边界：这些 stage 下标之后要插入分隔符，把字母切成 "CRP CRP F FR FR F" 六组
+  var mnemoGroupBreaks = { 2: true, 4: true, 5: true, 6: true, 7: true };
+  var mnemoStrip = document.getElementById("mnemo-strip");
+  var mnemoHtml = "";
+  stages.forEach(function (s, i) {
+    if (!s.mnemo) { return; }
+    mnemoHtml += '<span class="mnemo-seg" data-index="' + i + '" style="--seg-color:' + s.mnemoColor + '">' +
+      s.mnemo.replace(/ /g, "") + "</span>";
+    if (mnemoGroupBreaks[i]) { mnemoHtml += '<span class="mnemo-sep">·</span>'; }
+  });
+  mnemoStrip.innerHTML = mnemoHtml;
+  var mnemoSegs = Array.prototype.slice.call(mnemoStrip.querySelectorAll(".mnemo-seg"));
 
   var items = Array.prototype.slice.call(document.querySelectorAll(".flow-item"));
   var pulse = document.getElementById("pulse");
@@ -1022,6 +1092,9 @@
   function render() {
     items.forEach(function (li, i) {
       li.classList.toggle("is-active", i === current);
+    });
+    mnemoSegs.forEach(function (seg) {
+      seg.classList.toggle("is-active", Number(seg.dataset.index) === current);
     });
     indicator.textContent = (current + 1) + " / " + items.length;
     positionPulse();
