@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>编码追踪器</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&display=swap">
+
+<style>
+  :root {
+    --paper: #ECEEEA;
+    --paper-raised: #F5F6F3;
+    --ink: #14181B;
+    --ink-muted: #5B6560;
+    --ink-faint: #93998F;
+    --accent: #C6551F;
+    --accent-soft: #E8DDC9;
+    --line: #C7CBC4;
+    --line-strong: #A9AFA4;
+    --mono: "JetBrains Mono", ui-monospace, "SF Mono", Consolas, monospace;
+    --serif: "Source Serif 4", Georgia, "Songti SC", serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #14181B;
+      --paper-raised: #1B2023;
+      --ink: #E9ECE7;
+      --ink-muted: #8B958E;
+      --ink-faint: #565E5A;
+      --accent: #E2793B;
+      --accent-soft: #2B2620;
+      --line: #2B322F;
+      --line-strong: #3B443F;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper: #14181B;
+    --paper-raised: #1B2023;
+    --ink: #E9ECE7;
+    --ink-muted: #8B958E;
+    --ink-faint: #565E5A;
+    --accent: #E2793B;
+    --accent-soft: #2B2620;
+    --line: #2B322F;
+    --line-strong: #3B443F;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--serif);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    max-width: 46rem;
+    margin: 0 auto;
+    padding: 4rem 1.5rem 5rem;
+  }
+
+  header.hero {
+    margin-bottom: 3rem;
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  h1 {
+    font-family: var(--mono);
+    font-weight: 700;
+    font-size: clamp(1.7rem, 4.5vw, 2.35rem);
+    letter-spacing: -0.01em;
+    margin: 0.5rem 0 0.9rem;
+    text-wrap: balance;
+  }
+
+  .lede {
+    font-size: 1.05rem;
+    color: var(--ink-muted);
+    max-width: 40rem;
+    margin: 0;
+  }
+
+  .lede code {
+    font-family: var(--mono);
+    font-size: 0.92em;
+    background: var(--accent-soft);
+    color: var(--accent);
+    padding: 0.05em 0.35em;
+    border-radius: 0.3em;
+  }
+
+  /* three-term definition strip */
+  .terms {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: 0.6rem;
+    overflow: hidden;
+    margin: 2.2rem 0 3.2rem;
+  }
+
+  .term {
+    background: var(--paper-raised);
+    padding: 1.1rem 1.1rem 1.2rem;
+  }
+
+  .term .name {
+    font-family: var(--mono);
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--ink);
+  }
+
+  .term .desc {
+    font-size: 0.86rem;
+    color: var(--ink-muted);
+    margin-top: 0.35rem;
+    line-height: 1.5;
+  }
+
+  .term .metric {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--accent);
+    margin-top: 0.55rem;
+    letter-spacing: 0.02em;
+  }
+
+  /* section headings */
+  h2 {
+    font-family: var(--mono);
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    margin: 0 0 0.3rem;
+  }
+
+  .section-note {
+    font-size: 0.88rem;
+    color: var(--ink-muted);
+    margin: 0 0 1.4rem;
+  }
+
+  section.diagram {
+    margin-bottom: 3.4rem;
+  }
+
+  /* character chips */
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1.6rem;
+  }
+
+  .chip {
+    font-family: var(--mono);
+    display: flex;
+    align-items: baseline;
+    gap: 0.45rem;
+    border: 1px solid var(--line-strong);
+    background: var(--paper-raised);
+    color: var(--ink);
+    border-radius: 999px;
+    padding: 0.4rem 0.85rem;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+  }
+
+  .chip .glyph { font-size: 1rem; }
+  .chip .n { color: var(--ink-faint); font-size: 0.72rem; }
+
+  .chip:hover { border-color: var(--accent); }
+
+  .chip[aria-pressed="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--paper);
+  }
+  .chip[aria-pressed="true"] .n { color: color-mix(in srgb, var(--paper) 70%, transparent); }
+
+  .chips-tail {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+  }
+
+  .playbtn {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: none;
+    border: 1px solid var(--line-strong);
+    color: var(--ink-muted);
+    border-radius: 999px;
+    padding: 0.4rem 0.8rem;
+    cursor: pointer;
+  }
+  .playbtn:hover { color: var(--ink); border-color: var(--accent); }
+  .playbtn .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--ink-faint);
+  }
+  .playbtn[data-playing="true"] .dot {
+    background: var(--accent);
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.7); }
+  }
+
+  /* pipeline */
+  .pipeline {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr auto 1.6fr;
+    align-items: stretch;
+    gap: 0.6rem;
+    border: 1px solid var(--line);
+    background: var(--paper-raised);
+    border-radius: 0.8rem;
+    padding: 1.5rem 1.3rem;
+  }
+
+  @media (max-width: 720px) {
+    .pipeline {
+      grid-template-columns: 1fr;
+    }
+    .conduit { transform: rotate(90deg); margin: 0.2rem auto; }
+  }
+
+  .station {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    min-width: 0;
+  }
+
+  .station .label {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  .glyph-card {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 0.6rem;
+    font-size: 2.6rem;
+    min-height: 5.2rem;
+    color: var(--ink);
+  }
+  .glyph-card .charname {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--ink-muted);
+  }
+
+  .codepoint-card {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 0.6rem;
+    padding: 0.8rem 0.75rem;
+    font-family: var(--mono);
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    min-height: 5.2rem;
+    justify-content: center;
+  }
+  .codepoint-card .u {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .codepoint-card .bits {
+    font-size: 0.72rem;
+    color: var(--ink-muted);
+    letter-spacing: 0.03em;
+    word-break: break-all;
+  }
+
+  .bytes-card {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-content: center;
+  }
+
+  .byte {
+    font-family: var(--mono);
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 0.5rem;
+    padding: 0.4rem 0.5rem;
+    font-size: 0.68rem;
+    text-align: center;
+    opacity: 0;
+    transform: translateY(4px);
+    animation: rise 0.35s ease forwards;
+  }
+  .byte .hex {
+    color: var(--ink-faint);
+    font-size: 0.62rem;
+    margin-bottom: 0.2rem;
+  }
+  .byte .bits {
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+  }
+  .byte .bits .h { color: var(--accent); font-weight: 700; }
+  .byte .bits .p { color: var(--ink); }
+
+  @keyframes rise {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .byte { animation: none; opacity: 1; transform: none; }
+  }
+
+  /* conduit (arrow) */
+  .conduit {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.15rem;
+    padding: 0 0.1rem;
+    min-width: 4.4rem;
+  }
+
+  .conduit .op {
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    color: var(--ink-muted);
+    white-space: nowrap;
+  }
+  .conduit .op.fwd { color: var(--accent); }
+
+  .conduit svg { width: 100%; height: 22px; overflow: visible; }
+  .conduit .track { stroke: var(--line-strong); stroke-width: 1.5; }
+  .conduit .flow {
+    fill: var(--accent);
+  }
+  .conduit.fwd .flow {
+    animation: flow-fwd 1.6s linear infinite;
+  }
+  .conduit.rev .flow {
+    animation: flow-rev 1.6s linear infinite;
+  }
+  @keyframes flow-fwd {
+    0% { transform: translateX(0); opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { transform: translateX(46px); opacity: 0; }
+  }
+  @keyframes flow-rev {
+    0% { transform: translateX(46px); opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { transform: translateX(0); opacity: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .conduit .flow { animation: none; opacity: 0.6; }
+  }
+
+  .legend {
+    display: flex;
+    gap: 1.4rem;
+    margin-top: 1rem;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--ink-muted);
+    flex-wrap: wrap;
+  }
+  .legend .sw {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .legend .sw::before {
+    content: "";
+    width: 0.7rem; height: 0.7rem;
+    border-radius: 0.2rem;
+    background: var(--swatch, var(--ink-faint));
+  }
+  .legend .sw.header::before { background: var(--accent); }
+  .legend .sw.payload::before { background: var(--ink); }
+
+  /* reference table */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+  }
+  caption {
+    text-align: left;
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 0.6rem;
+  }
+  th, td {
+    text-align: left;
+    padding: 0.55rem 0.7rem;
+    border-bottom: 1px solid var(--line);
+    font-variant-numeric: tabular-nums;
+  }
+  th {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--ink-muted);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  td.range, td.bytes { font-family: var(--mono); font-size: 0.82rem; }
+  td.bytes { color: var(--accent); font-weight: 600; }
+  .table-wrap { overflow-x: auto; }
+
+  footer {
+    margin-top: 3rem;
+    padding-top: 1.4rem;
+    border-top: 1px solid var(--line);
+    font-size: 0.82rem;
+    color: var(--ink-faint);
+    font-family: var(--mono);
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <header class="hero">
+    <div class="eyebrow">chapter_02 · 编码</div>
+    <h1>一个字符，是怎么变成硬盘里的字节的</h1>
+    <p class="lede">
+      选一个字符，看它依次经过 <code>ord()</code> 变成 Unicode 码点，再经过 <code>encode('utf-8')</code>
+      拆成 1~4 个字节 —— 每个字节里，哪几位是"路标"、哪几位是真正的数据，一眼看清。
+    </p>
+  </header>
+
+  <div class="terms">
+    <div class="term">
+      <div class="name">ASCII</div>
+      <div class="desc">最早的英文字符表，128 个编号就够用。</div>
+      <div class="metric">0 ~ 127</div>
+    </div>
+    <div class="term">
+      <div class="name">Unicode</div>
+      <div class="desc">给全世界所有文字统一编号的总表。</div>
+      <div class="metric">0 ~ 10FFFF</div>
+    </div>
+    <div class="term">
+      <div class="name">UTF-8</div>
+      <div class="desc">把 Unicode 编号存成字节的具体规则。</div>
+      <div class="metric">1 ~ 4 字节/字</div>
+    </div>
+  </div>
+
+  <section class="diagram">
+    <h2>转换追踪</h2>
+    <p class="section-note">点选字符，或让它自动播放 —— 观察字节数如何随字符变化。</p>
+
+    <div class="chips" id="chips" role="group" aria-label="选择示例字符"></div>
+
+    <div class="pipeline">
+      <div class="station" id="stationChar">
+        <div class="label">字符</div>
+        <div class="glyph-card" id="glyphCard"></div>
+      </div>
+
+      <div class="conduit fwd" id="conduit1">
+        <span class="op fwd">ord()</span>
+        <svg viewBox="0 0 46 14" preserveAspectRatio="none">
+          <line class="track" x1="1" y1="7" x2="45" y2="7"></line>
+          <polygon class="track" points="45,7 39,4 39,10" fill="currentColor" stroke="none"></polygon>
+          <circle class="flow" cx="3" cy="7" r="2.2"></circle>
+        </svg>
+        <span class="op">chr()</span>
+      </div>
+
+      <div class="station" id="stationCode">
+        <div class="label">Unicode 码点</div>
+        <div class="codepoint-card">
+          <div class="u" id="uValue"></div>
+          <div class="bits" id="uBits"></div>
+        </div>
+      </div>
+
+      <div class="conduit fwd" id="conduit2">
+        <span class="op fwd">encode('utf-8')</span>
+        <svg viewBox="0 0 46 14" preserveAspectRatio="none">
+          <line class="track" x1="1" y1="7" x2="45" y2="7"></line>
+          <polygon class="track" points="45,7 39,4 39,10" fill="currentColor" stroke="none"></polygon>
+          <circle class="flow" cx="3" cy="7" r="2.2"></circle>
+        </svg>
+        <span class="op">decode('utf-8')</span>
+      </div>
+
+      <div class="station" id="stationBytes">
+        <div class="label">UTF-8 字节</div>
+        <div class="bytes-card" id="bytesCard"></div>
+      </div>
+    </div>
+
+    <div class="legend">
+      <span class="sw header">路标位 —— 说明这是第几个字节 / 还有没有下一个</span>
+      <span class="sw payload">数据位 —— 拼起来就是 Unicode 码点</span>
+    </div>
+  </section>
+
+  <section>
+    <div class="table-wrap">
+      <table>
+        <caption>UTF-8 字节数对照</caption>
+        <thead>
+          <tr><th>Unicode 码点范围</th><th>UTF-8 字节数</th><th>例子</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="range">U+0000 ~ U+007F</td><td class="bytes">1 字节</td><td>A · 0 · !</td></tr>
+          <tr><td class="range">U+0080 ~ U+07FF</td><td class="bytes">2 字节</td><td>é 等带重音字母</td></tr>
+          <tr><td class="range">U+0800 ~ U+FFFF</td><td class="bytes">3 字节</td><td>中 · 文</td></tr>
+          <tr><td class="range">U+10000 ~ U+10FFFF</td><td class="bytes">4 字节</td><td>😀 等表情符号</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>字符 → ord() → 码点 → encode('utf-8') → 字节，反过来就是 decode('utf-8') → chr()</footer>
+
+</div>
+
+<script>
+  const EXAMPLES = [
+    {
+      char: "A", name: "拉丁字母", cp: 0x0041,
+      bits: ["1000001"],
+      bytes: [{ hex: "41", header: "0", payload: "1000001" }]
+    },
+    {
+      char: "é", name: "带重音字母", cp: 0x00E9,
+      bits: ["00011", "101001"],
+      bytes: [
+        { hex: "C3", header: "110", payload: "00011" },
+        { hex: "A9", header: "10", payload: "101001" }
+      ]
+    },
+    {
+      char: "中", name: "汉字", cp: 0x4E2D,
+      bits: ["0100", "111000", "101101"],
+      bytes: [
+        { hex: "E4", header: "1110", payload: "0100" },
+        { hex: "B8", header: "10", payload: "111000" },
+        { hex: "AD", header: "10", payload: "101101" }
+      ]
+    },
+    {
+      char: "😀", name: "表情符号", cp: 0x1F600,
+      bits: ["000", "011111", "011000", "000000"],
+      bytes: [
+        { hex: "F0", header: "11110", payload: "000" },
+        { hex: "9F", header: "10", payload: "011111" },
+        { hex: "98", header: "10", payload: "011000" },
+        { hex: "80", header: "10", payload: "000000" }
+      ]
+    }
+  ];
+
+  const chipsEl = document.getElementById("chips");
+  const glyphCard = document.getElementById("glyphCard");
+  const uValue = document.getElementById("uValue");
+  const uBits = document.getElementById("uBits");
+  const bytesCard = document.getElementById("bytesCard");
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  let index = 0;
+  let playing = !reduceMotion;
+  let timer = null;
+
+  function buildChips() {
+    EXAMPLES.forEach((ex, i) => {
+      const btn = document.createElement("button");
+      btn.className = "chip";
+      btn.type = "button";
+      btn.setAttribute("aria-pressed", "false");
+      btn.innerHTML =
+        '<span class="glyph">' + ex.char + '</span>' +
+        '<span class="n">' + ex.bytes.length + ' 字节</span>';
+      btn.addEventListener("click", () => {
+        setPlaying(false);
+        render(i);
+      });
+      chipsEl.appendChild(btn);
+    });
+
+    const tail = document.createElement("div");
+    tail.className = "chips-tail";
+    const play = document.createElement("button");
+    play.className = "playbtn";
+    play.type = "button";
+    play.id = "playbtn";
+    play.innerHTML = '<span class="dot"></span><span id="playlabel">自动播放</span>';
+    play.addEventListener("click", () => setPlaying(!playing));
+    tail.appendChild(play);
+    chipsEl.appendChild(tail);
+  }
+
+  function setPlaying(v) {
+    playing = v;
+    const btn = document.getElementById("playbtn");
+    const label = document.getElementById("playlabel");
+    btn.setAttribute("data-playing", String(v));
+    label.textContent = v ? "播放中" : "自动播放";
+    if (timer) { clearInterval(timer); timer = null; }
+    if (v) {
+      timer = setInterval(() => render((index + 1) % EXAMPLES.length), 4200);
+    }
+  }
+
+  function render(i) {
+    index = i;
+    const ex = EXAMPLES[i];
+
+    Array.from(chipsEl.querySelectorAll(".chip")).forEach((c, ci) => {
+      c.setAttribute("aria-pressed", String(ci === i));
+    });
+
+    glyphCard.innerHTML =
+      '<div><div>' + ex.char + '</div><div class="charname">' + ex.name + '</div></div>';
+
+    uValue.textContent = "U+" + ex.cp.toString(16).toUpperCase().padStart(4, "0");
+    uBits.textContent = ex.bits.join(" ");
+
+    bytesCard.innerHTML = "";
+    ex.bytes.forEach((b, bi) => {
+      const el = document.createElement("div");
+      el.className = "byte";
+      el.style.animationDelay = (bi * 0.12) + "s";
+      el.innerHTML =
+        '<div class="hex">0x' + b.hex + '</div>' +
+        '<div class="bits"><span class="h">' + b.header + '</span><span class="p">' + b.payload + '</span></div>';
+      bytesCard.appendChild(el);
+    });
+  }
+
+  buildChips();
+  render(0);
+  if (playing) setPlaying(true);
+</script>
+</body>
+</html>
